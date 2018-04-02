@@ -1,0 +1,34 @@
+Ideas for bot algorithms:
+
+PROTECT THE ARCHER!
+ Goal:
+Create a formation of soliders which protect the an archer.
+Key: x = archer a = solider
+
+a a
+axa
+ a
+
+Archer cannot be got to without killing off at least one of the soliders first.
+Archer can shoot enemies without fear of death.
+
+Goal of formation:
+Reach the enemies base with minimum loses, and not losing the main archer, then destroy the base.
+
+Loop:
+Workers will constantly run between resources and the collection point. 
+Soliders will be spawned and walked to a position near their spawn.
+They will wait until enough soliders have been spawned to form the protective formation.
+An Archer will be spawned and will move into position in the formation.
+This formation will then advance to the enemies base, until enough untis die to break formation or until they reach and destroy the base.
+MEANWHILE the spawner and worker will keep working to make more of these formations.
+
+Pros:
+Very aggresive in a safe nature. Should maintain minmal loses while being very aggressive.
+Will make for quick games and avoid time outs / draws.
+
+
+Cons:
+Leaves very little defenses for our base.
+
+Things which may help: adding additional defensive algoritms.
