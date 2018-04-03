@@ -34,6 +34,8 @@ public class MyFirstBot extends AbstractionLayerAI
     UnitType lightType;
     UnitType heavyType;
 	
+    Formation form = new Formation();
+    
     //Stats trackers
     int workersTrained = 0;
     int rangedTrained = 0;
@@ -42,6 +44,11 @@ public class MyFirstBot extends AbstractionLayerAI
     
     int basesBuilt = 0;
     int barracksBuilt = 0;
+    
+    int numOfCollecters = 2;
+    int minNumOfAttackWorkers = 4;
+    
+    List<Unit> collecterWorkers = new LinkedList<Unit>();
     
     public MyFirstBot(UnitTypeTable a_utt)
     {
@@ -76,7 +83,7 @@ public class MyFirstBot extends AbstractionLayerAI
 		PhysicalGameState pgs = gs.getPhysicalGameState();
 		Player p = gs.getPlayer(player);
 		//Base behaviour
-		for(Unit u : pgs.getUnits()) 
+		/*for(Unit u : pgs.getUnits()) 
 		{
 			if(u.getType() == baseType && u.getPlayer() == player && gs.getActionAssignment(u) == null)
 			{baseBehavior(u, p, pgs);}
@@ -91,15 +98,53 @@ public class MyFirstBot extends AbstractionLayerAI
 		{
 			if(u.getType().canAttack && u.getType() == rangedType && !u.getType().canHarvest && u.getPlayer() == player && gs.getActionAssignment(u) == null) {turretUnitBehaviour(u, p, gs);}
 			else if(u.getType().canAttack && !u.getType().canHarvest && u.getPlayer() == player && gs.getActionAssignment(u) == null) {meleeUnitBehavior(u, p, gs);}//meleeUnitBehavior
-		}
+		}*/
 		
-		//Worker behaviours.
-		List<Unit> workers = new LinkedList<Unit>();
-		for(Unit u : pgs.getUnits())
+		
+		for (Unit u : pgs.getUnits())
 		{
-			if(u.getType().canHarvest && u.getPlayer() == player) {workers.add(u);}
+			//Base behaviour
+			if(u.getType() == baseType && u.getPlayer() == player && gs.getActionAssignment(u) == null)
+			{baseBehavior(u, p, pgs);}
+			//Barrack behaviour
+			if(u.getType() == barracksType && u.getPlayer() == player && gs.getActionAssignment(u) == null) {barrackBehavior(u, p, pgs);}
+			//Attack units
+			if(u.getType().canAttack && u.getType() == rangedType && !u.getType().canHarvest && u.getPlayer() == player && gs.getActionAssignment(u) == null) {turretUnitBehaviour(u, p, gs);}
+			else if(u.getType().canAttack && !u.getType().canHarvest && u.getPlayer() == player && gs.getActionAssignment(u) == null) {meleeUnitBehavior(u, p, gs);}//meleeUnitBehavior
+			//Workers not in the collecter list
+			if(u.getType().canHarvest && u.getPlayer() == player) { meleeUnitBehavior(u, p, gs);}
+			
+			//Setup collecter workers
+			if(collecterWorkers.size() < numOfCollecters)
+			{
+				if(u.getType() == workerType && u.getPlayer() == p.getID() && collecterWorkers.isEmpty())
+				{
+					collecterWorkers.add(u);
+				}else if(u.getType() == workerType && u.getPlayer() == p.getID() && !collecterWorkers.isEmpty())
+				{
+					for(int i = 0; i < collecterWorkers.size(); i++)
+					{
+						if(u != collecterWorkers.get(i))
+						{
+							collecterWorkers.add(u);
+						}
+					}
+				}
+			}
+			//Check if a collecter worker has died. If so remove them from the list of collecter workers, so that the position can be filled with a more lively worker.
+			for(int i = 0; i < collecterWorkers.size(); i++)
+			{
+				if(collecterWorkers.get(i).getHitPoints() <= 0)
+				{
+					System.out.println("Collecter lost");
+					collecterWorkers.remove(i);
+				}
+			}
 		}
-		workerBehavior(workers,p,pgs);
+		//Define behaviour for workers that will be collecting resoures.
+		workerBehavior(collecterWorkers,p,pgs);
+		
+
 		
 		return translateActions(player,gs);
 	}
@@ -108,19 +153,59 @@ public class MyFirstBot extends AbstractionLayerAI
 	public void baseBehavior(Unit u, Player p, PhysicalGameState pgs)
 	{
 		int nworkers = 0;
-		for (Unit u2 : pgs.getUnits())
+		
+		for(Unit u2 : pgs.getUnits())
 		{
 			if(u2.getType() == workerType && u2.getPlayer() == p.getID()) {nworkers++;}
 		}
-		if(nworkers < 2 && p.getResources() >= workerType.cost) {train(u, workerType);}
+		if(nworkers < numOfCollecters + minNumOfAttackWorkers && p.getResources() >= workerType.cost) 
+		{
+			train(u, workerType); 
+		}
 	}
 	
 	public void barrackBehavior(Unit u, Player p, PhysicalGameState pgs)
 	{
+		//Create a ranged unit who will guard the base
 		
-		if(p.getResources() >= rangedType.cost && rangedTrained == 0) {train(u, rangedType); rangedTrained++;}
+		//Create a ranged unit as the base of the formation
+		if(form.rangedUnit == null && p.getResources() >= rangedType.cost)
+		{
+			train(u, rangedType);
+			for(Unit u2 : pgs.getUnits())
+			{
+				if(u2.getType() == rangedType && u2.getPlayer() == p.getID())
+				{
+					form.rangedUnit = u2;
+					System.out.println(form.rangedUnit);
+				}
+			}
+		}
+		//Create heavy units to fill the formation
+		else if(form.rangedUnit != null && p.getResources() >= heavyType.cost)
+		{
+			train(u, heavyType);
+			for(Unit u2 : pgs.getUnits())
+			{
+				if(u2.getType() == heavyType && u2.getPlayer() == p.getID())
+				{	
+					for(int i = 0; i < form.heavyUnits.length; i++)
+					{
+						if(form.heavyUnits == null)
+						{
+							form.heavyUnits[i] = u2;
+							
+							i = form.heavyUnits.length;
+						}
+					}
+				}
+			}			
+		}
 		
-		else if(p.getResources() >= lightType.cost && rangedTrained > 0) {train(u, lightType); lightTrained++;}
+		
+		//if(p.getResources() >= rangedType.cost && rangedTrained == 0) {train(u, rangedType); rangedTrained++;}
+		
+		//else if(p.getResources() >= lightType.cost && rangedTrained > 0) {train(u, lightType); lightTrained++;}
 	}
 	
 	public void meleeUnitBehavior(Unit u, Player p, GameState gs)
@@ -147,6 +232,16 @@ public class MyFirstBot extends AbstractionLayerAI
 		}
 	}
 	
+	
+	public void WaitForFullFormation(Unit u, Player p, GameState gs)
+	{
+		//Move to base formation position
+		
+		//Wait until all of formation is there
+		
+		//Begin attack once ready.
+	}
+	
 	//Used ranged units as turrets to set up defensive stuff.
 	public void turretUnitBehaviour(Unit u, Player p, GameState gs)
 	{
@@ -158,8 +253,8 @@ public class MyFirstBot extends AbstractionLayerAI
 		{
 			if(u2.getPlayer() >= 0 && u2.getPlayer() != p.getID())
 			{
-				int d = (u2.getX() - u.getX()) + (u2.getY() - u.getY());
-				d = d / 2;
+				int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
+				//d = d / 2;
 				if(closestEnemy == null || d < closestDistance)
 				{
 					closestEnemy = u2;
@@ -171,6 +266,7 @@ public class MyFirstBot extends AbstractionLayerAI
 		if(closestDistance + 1 >= u.getAttackRange())
 		{
 			idle(u);
+			
 		}
 		//Attack closest enemy when in range.
 		else if(closestEnemy != null)
@@ -179,6 +275,7 @@ public class MyFirstBot extends AbstractionLayerAI
 		}
 	}
 	
+
 	public void workerBehavior(List<Unit> workers, Player p, PhysicalGameState pgs)
 	{
 		int baseNum = 0;
