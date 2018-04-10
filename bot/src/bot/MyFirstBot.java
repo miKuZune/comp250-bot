@@ -46,10 +46,13 @@ public class MyFirstBot extends AbstractionLayerAI
     int numOfCollecters = 2;
     int minNumOfAttackWorkers = 4;
     
-    int fullFormationSize = 4;
+    int fullFormationSize = 5;
+    
+    int formationOffsets[][] = new int[][]{{0, 0}, {1,0}, {-1,0}, {0,1}, {0,-1}};
     
     List<Unit> collecterWorkers = new LinkedList<Unit>();
     List<Unit> formation = new LinkedList<Unit>();
+    boolean formationReady = false;
     
     public MyFirstBot(UnitTypeTable a_utt)
     {
@@ -143,7 +146,7 @@ public class MyFirstBot extends AbstractionLayerAI
 		
 		return translateActions(player,gs);
 	}
-
+	
 	//Unit actions
 	public void baseBehavior(Unit u, Player p, PhysicalGameState pgs)
 	{
@@ -177,45 +180,10 @@ public class MyFirstBot extends AbstractionLayerAI
 		}else if (rangedCount < 3 && p.getResources() >= rangedType.cost)
 		{
 			train(u, rangedType);
-		}else if(heavyCount < 3 && p.getResources() >= rangedType.cost) 
+		}else if(heavyCount < fullFormationSize - 1 && p.getResources() >= rangedType.cost) 
 		{
 			train(u, heavyType);
 		}
-		
-		//Create a ranged unit who will guard the base
-		
-		//Create a ranged unit as the base of the formation
-		/*if(form.rangedUnit == null && p.getResources() >= rangedType.cost)
-		{
-			train(u, rangedType);
-			for(Unit u2 : pgs.getUnits())
-			{
-				if(u2.getType() == rangedType && u2.getPlayer() == p.getID())
-				{
-					form.rangedUnit = u2;
-				}
-			}
-		}
-		//Create heavy units to fill the formation
-		else if(form.rangedUnit != null && p.getResources() >= heavyType.cost)
-		{
-			train(u, heavyType);
-			for(Unit u2 : pgs.getUnits())
-			{
-				if(u2.getType() == heavyType && u2.getPlayer() == p.getID())
-				{	
-					for(int i = 0; i < form.heavyUnits.length; i++)
-					{
-						if(form.heavyUnits == null)
-						{
-							form.heavyUnits[i] = u2;
-							
-							i = form.heavyUnits.length;
-						}
-					}
-				}
-			}			
-		}*/
 	}
 	
 	public void meleeUnitBehavior(Unit u, Player p, GameState gs)
@@ -270,11 +238,10 @@ public class MyFirstBot extends AbstractionLayerAI
 	
 	public void FormationBehaviour(List<Unit> currFormation, Player p, GameState gs)
 	{
-		Unit closestEnemy = null;
-		int closestDistance = 0;
-		
 		Unit base = null;
 		Unit enemyBase = null;
+		boolean unitsInPosition[] = new boolean[fullFormationSize];
+		//Gets our base and the enemy base.
 		for(Unit u2 : gs.getUnits())
 		{
 			if(u2.getType() == baseType && u2.getPlayer() == p.getID()) {base = u2;}
@@ -282,30 +249,93 @@ public class MyFirstBot extends AbstractionLayerAI
 			
 		}
 		
+		//Goes through each member of the formation and decides their actions
 		for(int i = 0; i < currFormation.size(); i++)
 		{
-			if(currFormation.size() < fullFormationSize)
+			if(!formationReady)
 			{
-				move(currFormation.get(i), base.getX() + 3 - i, base.getY() + 3);
+				//Do actions
+				if(base != null) 
+				{
+					int xOffset = formationOffsets[i][0], yOffset = formationOffsets[i][1];
+					move(currFormation.get(i), base.getX() + 3 + xOffset , base.getY() + 3 + yOffset);
+					if(currFormation.get(i).getX() == base.getX() + 3 + xOffset && currFormation.get(i).getY() == base.getY() + 3 + yOffset)
+					{
+						unitsInPosition[i] = true;
+					}
+					Unit closest = null;
+					int closestDist = 0;
+					for(Unit u2 : gs.getUnits())
+					{
+						if(u2.getPlayer() >= 0 && u2.getPlayer() != p.getID())
+						{
+							int d = Math.abs(u2.getX() - currFormation.get(i).getX()) + Math.abs(u2.getY() - currFormation.get(i).getY());
+							if(closest == null || d < closestDist )
+							{
+								closest = u2;
+								closestDist = d;
+							}
+						}
+					}
+					
+					if(closestDist <= currFormation.get(i).getAttackRange())
+					{
+						attack(currFormation.get(i), closest);
+					}
+					
+				}else
+				{
+					Unit closest = null;
+					int closestDist = 0;
+					for(Unit u2 : gs.getUnits())
+					{
+						if(u2.getPlayer() >= 0 && u2.getPlayer() != p.getID())
+						{
+							int d = Math.abs(u2.getX() - currFormation.get(i).getX()) + Math.abs(u2.getY() - currFormation.get(i).getY());
+							if(closest == null || d < closestDist )
+							{
+								closest = u2;
+								closestDist = d;
+							}
+						}
+						
+					}
+					attack(currFormation.get(i), closest);
+				}
+				//Check if the formation is ready
+				boolean anyUnitNotReady = false;
+				for(boolean uReady : unitsInPosition)
+				{
+					if(uReady != true)
+					{
+						anyUnitNotReady = true;
+					}
+				}
+				if(!anyUnitNotReady)
+				{
+					formationReady = true;
+				}
+				
 			}else 
 			{
 				if(enemyBase != null) {attack(currFormation.get(i), enemyBase);}
 				else 
 				{
-					for(Unit u2 : gs.getUnits())
+					Unit closest = null;
+					int closestDist = 0;
+					for(Unit u2: gs.getUnits())
 					{
-						int d = Math.abs(u2.getX() - currFormation.get(i).getX()) + Math.abs(u2.getY() - currFormation.get(i).getY());
-						if(closestEnemy == null || d < closestDistance)
+						if(u2.getPlayer() != p.getID() && u2.getPlayer() >= 0)
 						{
-							closestEnemy = u2;
-							closestDistance = d;
-						}
-						if(closestEnemy != null)
-						{
-							attack(currFormation.get(i), closestEnemy);
+							int d = Math.abs(u2.getX() - currFormation.get(i).getX()) + Math.abs(u2.getY() - currFormation.get(i).getY());
+							if(d < closestDist||closest == null)
+							{
+								closest = u2;
+								closestDist = d;
+							}
 						}
 					}
-					
+					attack(currFormation.get(i), closest);
 				}
 			}
 			
@@ -318,31 +348,38 @@ public class MyFirstBot extends AbstractionLayerAI
 		PhysicalGameState pgs = gs.getPhysicalGameState();
 		Unit closestEnemy = null;
 		int closestDistance = 0;
+		Unit enemyBase = null;
 		//Find the closest enemy.
 		for(Unit u2 : pgs.getUnits())
 		{
 			if(u2.getPlayer() >= 0 && u2.getPlayer() != p.getID())
 			{
 				int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
-				//d = d / 2;
 				if(closestEnemy == null || d < closestDistance)
 				{
 					closestEnemy = u2;
 					closestDistance = d;
 				}
 			}
+			if(u2.getType() == baseType && u2.getPlayer() != p.getID())
+			{
+				enemyBase = u2;
+			}
 		}
+		
+		
 		//Do nothing while closest enemy is not in range.
-		if(closestDistance + 1 >= u.getAttackRange())
+		if(closestDistance + 1 >= u.getAttackRange() && enemyBase != null)
 		{
 			idle(u);
 			
 		}
 		//Attack closest enemy when in range.
-		else if(closestEnemy != null)
+		else if(closestEnemy != null || enemyBase == null)
 		{
 			attack(u, closestEnemy);
 		}
+		
 	}
 	
 
