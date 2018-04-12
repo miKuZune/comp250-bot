@@ -120,7 +120,7 @@ public class MyFirstBot extends AbstractionLayerAI
 			if(formation.size() < fullFormationSize)
 			{
 				if(u.getType() == rangedType && u.getPlayer() == p.getID() && formation.isEmpty()) {formation.add(u); System.out.println("Added ranged to formation.");}
-				else if(u.getType() == heavyType && u.getPlayer() == p.getID() && !formation.isEmpty())
+				else if(u.getType() == lightType && u.getPlayer() == p.getID() && !formation.isEmpty())
 				{
 					if(!formation.contains(u))
 					{
@@ -167,11 +167,13 @@ public class MyFirstBot extends AbstractionLayerAI
 	{
 		int rangedCount = 0;
 		int heavyCount = 0;
+		int lightCount = 0;
 		
 		for(Unit u2 : pgs.getUnits())
 		{
 			if(u2.getPlayer() == p.getID() && u2.getType() == rangedType){rangedCount++;}
 			else if (u2.getPlayer() == p.getID() && u2.getType() == heavyType) {heavyCount++;}
+			else if(u2.getPlayer() == p.getID() && u2.getType() == lightType) {lightCount++;}
 		}
 		
 		if(rangedCount < 2 && p.getResources() >= rangedType.cost)
@@ -180,9 +182,9 @@ public class MyFirstBot extends AbstractionLayerAI
 		}else if (rangedCount < 3 && p.getResources() >= rangedType.cost)
 		{
 			train(u, rangedType);
-		}else if(heavyCount < fullFormationSize - 1 && p.getResources() >= rangedType.cost) 
+		}else if(lightCount < fullFormationSize - 1 && p.getResources() >= lightType.cost) 
 		{
-			train(u, heavyType);
+			train(u, lightType);
 		}
 	}
 	
@@ -338,7 +340,6 @@ public class MyFirstBot extends AbstractionLayerAI
 					attack(currFormation.get(i), closest);
 				}
 			}
-			
 		}
 	}
 	
@@ -349,11 +350,19 @@ public class MyFirstBot extends AbstractionLayerAI
 		Unit closestEnemy = null;
 		int closestDistance = 0;
 		Unit enemyBase = null;
+		
+		int enemyUnitCount = 0;
+		
 		//Find the closest enemy.
 		for(Unit u2 : pgs.getUnits())
 		{
 			if(u2.getPlayer() >= 0 && u2.getPlayer() != p.getID())
 			{
+				if(u2.getType() != baseType && u2.getType() != barracksType)
+				{
+					enemyUnitCount++;
+				}
+				
 				int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
 				if(closestEnemy == null || d < closestDistance)
 				{
@@ -378,6 +387,11 @@ public class MyFirstBot extends AbstractionLayerAI
 		else if(closestEnemy != null || enemyBase == null)
 		{
 			attack(u, closestEnemy);
+		}
+		
+		if(enemyUnitCount <= 1 && enemyBase != null)
+		{
+			attack(u, enemyBase);
 		}
 		
 	}
