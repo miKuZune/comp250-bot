@@ -13,6 +13,7 @@ import java.util.List;
 import rts.*;
 import rts.units.Unit;
 import rts.units.UnitType;
+import rts.units.UnitTypeTable;
 import util.Pair;
 
 /**
@@ -148,6 +149,10 @@ public abstract class AbstractionLayerAI extends AIWithComputationBudget {
     public void noMoveAttack(Unit u, Unit target)
     {
     	actions.put(u, new attackNoMove(u, target, pf));
+    }
+    public void trainTowardEnemy(UnitTypeTable tt, Unit u, UnitType type, int playerID)
+    {
+    	actions.put(u, new TrainTowardEnemy(tt, u, type, playerID));
     }
 
     public int findBuildingPosition(List<Integer> reserved, int desiredX, int desiredY, Player p, PhysicalGameState pgs) {

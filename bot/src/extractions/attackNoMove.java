@@ -41,13 +41,8 @@ public class attackNoMove extends AbstractAction
 		double d = Math.sqrt(dx*dx+dy*dy);
 		if(d <= unit.getAttackRange())
 		{
-			return new UnitAction(UnitAction.TYPE_ATTACK_LOCATION, target.getX(), target.getY());
-		}else if(d <= unit.getAttackRange() + 1)
-		{
-			UnitAction move = pf.findPathToPositionInRange(unit, target.getX()+target.getY()*pgs.getPhysicalGameState().getWidth(), unit.getAttackRange(), pgs, ru);
-            if (move!=null && pgs.isUnitActionAllowed(unit, move)) return move;
+			return new UnitAction(UnitAction.TYPE_ATTACK_LOCATION,target.getX(),target.getY());
 		}
-		else {return null;}
 		return null;
 	}
 
