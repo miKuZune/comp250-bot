@@ -36,6 +36,8 @@ public class Wanli extends AbstractionLayerAI
 	int maxNumberCollecterWorkers = 2;
 	int maxNumberAttackWorkers = 4;
 	
+	int tileCount = 0;
+	
 	public Wanli(UnitTypeTable a_utt)
 	{
 		this(a_utt, new AStarPathFinding());
@@ -69,46 +71,104 @@ public class Wanli extends AbstractionLayerAI
 		PhysicalGameState pgs = gs.getPhysicalGameState();
 		Player p = gs.getPlayer(player);
 		
-		//Unit lists
-		List<Unit> collecters = new LinkedList<Unit>();
-		List<Unit> attackerWorkers = new LinkedList<Unit>();
+		tileCount = pgs.getWidth() * pgs.getHeight();
+		
+		
+		if(tileCount <= 100)
+		{
+			workerRushActions(p, pgs);
+		}else
+		{
+			flankActions(p, pgs);
+		}
+		
+		
+		return translateActions(player,gs);
+	}
+  
+	
+	public void workerRushActions(Player p, PhysicalGameState pgs)
+	{
+		List<Unit> collecter = new LinkedList<Unit>();
+		List<Unit> rushAttackers = new LinkedList<Unit>();
 		List<Unit> bases = new LinkedList<Unit>();
 		List<Unit> barracks = new LinkedList<Unit>();
-		List<Unit> rangedTypes = new LinkedList<Unit>();
 		
-		//Give units behaviours.
 		for(Unit u : pgs.getUnits())
 		{
 			if(u.getPlayer() == p.getID())
 			{
 				if(u.getType() == workerType)
 				{
-					if(collecters.size() <= maxNumberCollecterWorkers)
+					if(collecter.size() < maxNumberCollecterWorkers)
 					{
-						collecters.add(u);
+						collecter.add(u);
 					}else
 					{
-						attackerWorkers.add(u);
-					}	
+						rushAttackers.add(u);
+					}
+				}else if(u.getType() == baseType)
+				{
+					bases.add(u);
+				}else if(u.getType() == barracksType)
+				{
+					barracks.add(u);
 				}
-				
-				else if(u.getType() == baseType){bases.add(u); currWallOffset = u.getY();}
-				else if(u.getType() == barracksType){barracks.add(u);}
-				else if(u.getType() == rangedType) {attackerWorkers.add(u);}
-				else if(u.getType() == lightType) {attackerWorkers.add(u);}
+				else if(u.getType() == heavyType)
+				{
+					rushAttackers.add(u);
+				}
 			}
 		}
 		
-		
-		workerBehaviour(collecters, p, pgs);
-		workerAttack(attackerWorkers, p, pgs);
+		workerBehaviour(collecter, p, pgs);
+		attackClosest(rushAttackers, p, pgs);
 		baseBehaviour(bases, p, pgs);
-		barrackBehav(barracks, p, pgs);
-		wallBehaviour(rangedTypes, p, pgs);
-		
-		return translateActions(player,gs);
+		barrackBehaviour(barracks, p , pgs);
 	}
-  
+	
+	public void flankActions(Player p, PhysicalGameState pgs)
+	{
+		//Unit lists
+				List<Unit> collecters = new LinkedList<Unit>();
+				List<Unit> attackerWorkers = new LinkedList<Unit>();
+				List<Unit> bases = new LinkedList<Unit>();
+				List<Unit> barracks = new LinkedList<Unit>();
+				List<Unit> sideAttackers = new LinkedList<Unit>();
+				
+				//Give units behaviours.
+				for(Unit u : pgs.getUnits())
+				{
+					if(u.getPlayer() == p.getID())
+					{
+						if(u.getType() == workerType)
+						{
+							if(collecters.size() <= maxNumberCollecterWorkers)
+							{
+								collecters.add(u);
+							}else
+							{
+								attackerWorkers.add(u);
+							}	
+						}
+						
+						else if(u.getType() == baseType){bases.add(u); currWallOffset = u.getY();}
+						else if(u.getType() == barracksType){barracks.add(u);}
+						else if(u.getType() == rangedType) {sideAttackers.add(u);}
+						else if(u.getType() == lightType) {sideAttackers.add(u);}
+					}
+				}
+				
+				
+				workerBehaviour(collecters, p, pgs);
+				attackClosest(attackerWorkers, p, pgs);
+				baseBehaviour(bases, p, pgs);
+				barrackBehaviour(barracks, p, pgs);
+				flankAttack(sideAttackers, p, pgs);
+				//wallBehaviour(rangedTypes, p, pgs);
+				
+	}
+	
 	public void baseBehaviour(List<Unit> bases, Player p, PhysicalGameState pgs)
 	{
 		if(bases.isEmpty()) {return;}
@@ -122,26 +182,103 @@ public class Wanli extends AbstractionLayerAI
 		
 		if(p.getResources() >= workerType.cost && numOfWorkers <= maxNumberCollecterWorkers + maxNumberAttackWorkers)
 		{
-			train(bases.get(0), workerType);
+			trainTowardEnemy(utt, bases.get(0), workerType, p.getID());
 		}
 	}
 	
-	public void barrackBehav(List<Unit> barracks, Player p, PhysicalGameState pgs)
+	public void barrackBehaviour(List<Unit> barracks, Player p, PhysicalGameState pgs)
 	{
-		for(Unit barrack : barracks)
+		int lightCount = 0;
+		int rangedCount = 0;
+		
+		for(Unit u : pgs.getUnits())
 		{
-			if(p.getResources() >= lightType.cost) {train(barrack, lightType);}
+			if(u.getPlayer() == p.getID())
+			{
+				if(u.getType() == lightType) {lightCount++;}
+				else if(u.getType() == rangedType) {rangedCount++;}
+			}
 		}
+		
+		if(tileCount > 100)
+		{
+			for(Unit barrack : barracks)
+			{
+				//Train a light type then a ranged type
+				
+				if(rangedCount < lightCount)
+				{
+					if(p.getResources() >= rangedType.cost)
+					{
+						trainTowardEnemy(utt, barrack, rangedType, p.getID());
+					}
+				}else
+				{
+					if(p.getResources() >= lightType.cost)
+					{
+						trainTowardEnemy(utt, barrack, lightType, p.getID());
+					}
+				}
+			}
+		}else
+		{
+			for(Unit barrack : barracks)
+			{
+				if(p.getResources() >= heavyType.cost)
+				{
+					trainTowardEnemy(utt, barrack, heavyType, p.getID());
+				}
+			}
+		}
+		
 	}
 	
-	public void wallBehaviour(List<Unit> wall, Player p, PhysicalGameState pgs)
+	public void flankAttack(List<Unit> attackers, Player p, PhysicalGameState pgs)
+	{
+		int enemyBaseX = 0, enemyBaseY = 0;
+		
+		for(Unit u : pgs.getUnits())
+		{
+			if(u.getType() == baseType)
+			{
+				if(u.getPlayer() != p.getID())
+				{
+					enemyBaseX = u.getX();
+					enemyBaseY = u.getY();
+				}
+			}
+		}
+		
+		int halfMap = pgs.getHeight()/2;
+		
+		List<Unit> unitsReadyToAttack = new LinkedList<Unit>();
+		for(Unit u : attackers)
+		{
+			if(enemyBaseX != 0 && enemyBaseY != 0)
+			{
+				int distanceToBase = Math.abs(enemyBaseX - u.getX()) + Math.abs(enemyBaseY - u.getY());
+				if(distanceToBase > halfMap)
+				{
+					if(u.getX() != enemyBaseX)
+					{
+						move(u, enemyBaseX, u.getY());
+					}else if(u.getY() != enemyBaseY)
+					{
+						attack(u, pgs.getUnitAt(enemyBaseX, enemyBaseY));
+					}
+				}else {unitsReadyToAttack.add(u);}
+			}else {unitsReadyToAttack.add(u);}
+		}
+		attackClosest(unitsReadyToAttack, p, pgs);
+	}
+	
+	/*public void wallBehaviour(List<Unit> wall, Player p, PhysicalGameState pgs)
 	{
 		if(wall.isEmpty()) {return;}
 		
 		
 		if(wallIsMoving)
 		{
-			
 			for(Unit u: wall)
 			{
 				move(u, u.getX() +3, u.getY());
@@ -152,15 +289,16 @@ public class Wanli extends AbstractionLayerAI
 			{
 				Unit closestEnemy = null;
 				int closestDist = 0;
+				int mapMiddle = pgs.getWidth() / 2;
 				
+				int posCounter = 0;
 				for(Unit u2: pgs.getUnits())
 				{					
 					if(u2.getPlayer() >= 0 && u2.getPlayer() != p.getID())
 					{
-						if(u2.getY() != currWallOffset)
-						{
-							int mapMiddle = pgs.getWidth() / 2;
-							move(u, mapMiddle, currWallOffset);
+						if(u.getY() != currWallOffset)
+						{							
+							move(u, mapMiddle + posCounter, currWallOffset);
 						}else {
 							int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
 							if(d < closestDist || closestEnemy == null)
@@ -171,17 +309,17 @@ public class Wanli extends AbstractionLayerAI
 							
 							if(closestEnemy != null)
 							{
-								System.out.println(u.getAttackRange());
 								noMoveAttack(u, closestEnemy);
 							}
 						}
 					}
+					posCounter ++;
 				}
 			}
 		}
-	}
+	}*/
 	
-	public void workerAttack(List<Unit> attackers, Player p, PhysicalGameState pgs)
+	public void attackClosest(List<Unit> attackers, Player p, PhysicalGameState pgs)
 	{
 		for(Unit u : attackers)
 		{
@@ -212,6 +350,7 @@ public class Wanli extends AbstractionLayerAI
 	{
 		int baseNum = 0;
 		int barrackNum = 0;
+		int workerNum = 0;
 		
 		List<Unit> freeWorkers = new LinkedList<Unit>();
 		freeWorkers.addAll(workers);
@@ -220,8 +359,12 @@ public class Wanli extends AbstractionLayerAI
 		
 		for (Unit u2 : pgs.getUnits())
 		{
-			if(u2.getType() == baseType && u2.getPlayer() == p.getID()) {baseNum++;}
-			if(u2.getType() == barracksType && u2.getPlayer() == p.getID()) {barrackNum++;}
+			if(u2.getPlayer() == p.getID())
+			{
+				if(u2.getType() == baseType) {baseNum++;}
+				else if(u2.getType() == barracksType) {barrackNum++;}
+				else if(u2.getType() == workerType) {workerNum++;}
+			}
 		}
 		
 		List<Integer> reservedPositions = new LinkedList<Integer>();
@@ -235,24 +378,46 @@ public class Wanli extends AbstractionLayerAI
 		}
 		if(barrackNum == 0 && !freeWorkers.isEmpty())
 		{
-			if(p.getResources() >= barracksType. cost )
+			//Build barracks immediatley if the map is big enough.
+			if(tileCount > 100)
 			{
-				//Get the position of our base.
-				int basePosX = 0, basePosY = 0;
-				for(Unit u3 : pgs.getUnits())
+				if(p.getResources() >= barracksType. cost )
 				{
-					if(u3.getType() == baseType && u3.getPlayer() == p.getID())
+					//Get the position of our base.
+					int basePosX = 0, basePosY = 0;
+					for(Unit u3 : pgs.getUnits())
 					{
-						basePosX = u3.getX();
-						basePosY = u3.getY();
+						if(u3.getType() == baseType && u3.getPlayer() == p.getID())
+						{
+							basePosX = u3.getX();
+							basePosY = u3.getY();
+						}
 					}
+					
+					
+					Unit u = freeWorkers.remove(0);
+					buildIfNotAlreadyBuilding(u, barracksType, basePosX, basePosY + 2, reservedPositions, p, pgs);
 				}
-				
-				
-				Unit u = freeWorkers.remove(0);
-				buildIfNotAlreadyBuilding(u, barracksType, basePosX, basePosY + 2, reservedPositions, p, pgs);
-
+			}else
+			{
+				if(p.getResources() >= barracksType.cost + 4)
+				{
+					int basePosX = 0, basePosY = 0;
+					for(Unit u3 : pgs.getUnits())
+					{
+						if(u3.getType() == baseType && u3.getPlayer() == p.getID())
+						{
+							basePosX = u3.getX();
+							basePosY = u3.getY();
+						}
+					}
+					
+					
+					Unit u = freeWorkers.remove(0);
+					buildIfNotAlreadyBuilding(u, barracksType, basePosX, basePosY + 2, reservedPositions, p, pgs);
+				}
 			}
+			
 		} 
 		
 		for (Unit u : freeWorkers)
@@ -297,9 +462,6 @@ public class Wanli extends AbstractionLayerAI
 			}
 		}
 	}
-	
-	
-	
 	
 	@Override
 	public AI clone() {
