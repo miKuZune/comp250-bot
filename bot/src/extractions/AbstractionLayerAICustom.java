@@ -20,7 +20,7 @@ import util.Pair;
  *
  * @author miKuZune
  */
-public abstract class AbstractionLayerAI extends AIWithComputationBudget {
+public abstract class AbstractionLayerAICustom extends AIWithComputationBudget {
 
     // set this to true, if you believe there is a bug, and want to verify that actions
     // being generated are actually possible before sending to the game.
@@ -41,12 +41,12 @@ public abstract class AbstractionLayerAI extends AIWithComputationBudget {
     // between the old units and the new ones
     protected GameState lastGameState = null;
 
-    public AbstractionLayerAI(PathFinding a_pf) {
+    public AbstractionLayerAICustom(PathFinding a_pf) {
         super(-1, -1);
         pf = a_pf;
     }
 
-    public AbstractionLayerAI(PathFinding a_pf, int timebudget, int cyclesbudget) {
+    public AbstractionLayerAICustom(PathFinding a_pf, int timebudget, int cyclesbudget) {
         super(timebudget, cyclesbudget);
         pf = a_pf;
     }
