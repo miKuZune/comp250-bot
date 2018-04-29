@@ -323,7 +323,7 @@ public class Wanli extends AbstractionLayerAICustom
 			
 			
 			
-			if(enemyBase != null && !overrideMovement)
+			if(enemyBase != null && ourBase != null && !overrideMovement)
 			{
 				int distanceToBase = CalcDistance(u, enemyBase);
 				if(distanceToBase > halfMap)
