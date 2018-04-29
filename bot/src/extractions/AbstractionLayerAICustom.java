@@ -159,16 +159,6 @@ public abstract class AbstractionLayerAICustom extends AIWithComputationBudget {
 
         boolean[][] free = pgs.getAllFree();
         int x, y;
-
-        /*
-        System.out.println("-" + desiredX + "," + desiredY + "-------------------");
-        for(int i = 0;i<free[0].length;i++) {
-            for(int j = 0;j<free.length;j++) {
-                System.out.print(free[j][i] + "\t");
-            }
-            System.out.println("");
-        }
-        */
         
         for (int l = 1; l < Math.max(pgs.getHeight(), pgs.getWidth()); l++) {
             for (int side = 0; side < 4; side++) {

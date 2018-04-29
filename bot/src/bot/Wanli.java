@@ -33,7 +33,7 @@ public class Wanli extends AbstractionLayerAICustom
 	int tileCount = 0;
 	
 	//Const ints
-	int maxNumberCollecterWorkers = 2;
+	int maxNumberCollecterWorkers = 3;
 	int maxNumberAttackWorkers = 4;
 	int NoWhereMapSize = 72;
 	
@@ -119,7 +119,7 @@ public class Wanli extends AbstractionLayerAICustom
 		rushAttackers.addAll(rangedUnits);
 		//Dictate units behvaiours.
 		workerBehaviour(collecter, p, pgs);
-		
+		//Use different rush strategy if on 9x8 map.
 		if(tileCount == NoWhereMapSize)
 		{
 			attackClosest(rushAttackers, enemyUnits, p, pgs);
@@ -134,11 +134,11 @@ public class Wanli extends AbstractionLayerAICustom
 	
 	public void flankActions(Player p, PhysicalGameState pgs)
 	{
-
+		//Lists to store units to dictate behaviour
 		List<Unit> collecters = new LinkedList<Unit>();	
 		List<Unit> rushAttackers = new LinkedList<Unit>();
 		List<Unit> flankAttackers = new LinkedList<Unit>();
-		
+		//Sort worker units into different lists.
 		for(Unit u : workers)
 		{
 			if(collecters.size() < maxNumberCollecterWorkers)
@@ -163,6 +163,7 @@ public class Wanli extends AbstractionLayerAICustom
 	//Lists all our teams units by team and makes a list of enemy units.
 	public void ListCurrentUnitsByType(Player p, PhysicalGameState pgs)
 	{
+		//Empty unit lists. 
 		workers.clear();
 		bases.clear();
 		barracks.clear();
@@ -171,24 +172,19 @@ public class Wanli extends AbstractionLayerAICustom
 		lightUnits.clear();
 		enemyUnits.clear();
 		
+		//Sort units into appropriate lists.
 		for(Unit u : pgs.getUnits())
 		{
-			if(u.getPlayer() == p.getID())
-			{
-				if(u.getType() == workerType)
-				{
-					workers.add(u);
-				}
-				
+			if(u.getPlayer() == p.getID()) {
+
+				if(u.getType() == workerType){workers.add(u);}
 				else if(u.getType() == baseType){bases.add(u);}
 				else if(u.getType() == barracksType){barracks.add(u);}
 				else if(u.getType() == rangedType) {rangedUnits.add(u);}
 				else if(u.getType() == lightType) {lightUnits.add(u);}
 				else if(u.getType() == heavyType) {heavyUnits.add(u);}
-			}else if(u.getPlayer() >= 0 && u.getPlayer() != p.getID())
-			{
-				enemyUnits.add(u);
-			}
+			
+			}else if(u.getPlayer() >= 0 && u.getPlayer() != p.getID()){	enemyUnits.add(u);}
 		}
 	}
 	
@@ -198,8 +194,6 @@ public class Wanli extends AbstractionLayerAICustom
 	{
 		//Don't do anything if there arn't any bases.
 		if(bases.isEmpty()) {return;}
-		
-		
 		
 		//Count the current number of workers we own.
 		int numOfWorkers = 0;
@@ -225,11 +219,6 @@ public class Wanli extends AbstractionLayerAICustom
 				}
 			}
 		}
-		
-		
-		
-		
-		
 	}
 	//How do barracks behave.
 	public void barrackBehaviour(List<Unit> barracks, Player p, PhysicalGameState pgs)
@@ -292,24 +281,28 @@ public class Wanli extends AbstractionLayerAICustom
 	public void flankAttack(List<Unit> attackers, List<Unit> enemies, Player p, PhysicalGameState pgs)
 	{
 		Unit enemyBase = null;
-		
-		for(Unit u : enemies)
+		Unit ourBase = null;
+		for(Unit u : pgs.getUnits())
 		{
 			if(u.getType() == baseType)
 			{
 				if(u.getPlayer() != p.getID())
 				{
 					enemyBase = u;
+				}else
+				{
+					ourBase = u;
 				}
 			}
 		}
 		//Find the halfway point of the map
 		int halfMap = pgs.getHeight()/2;
-		
+		int halfMapW = pgs.getWidth()/2;
 		//Get a list of units who are close enough to attack
 		List<Unit> unitsReadyToAttack = new LinkedList<Unit>();
 		for(Unit u : attackers)
 		{
+			boolean overrideMovement = false;
 			int closestDistance = 0;
 			for(Unit u2 : enemies)
 			{
@@ -325,20 +318,24 @@ public class Wanli extends AbstractionLayerAICustom
 			if(closestDistance <= u.getAttackRange() + 1)
 			{
 				unitsReadyToAttack.add(u);
+				overrideMovement = true;
 			}
 			
-			if(enemyBase != null)
+			
+			
+			if(enemyBase != null && !overrideMovement)
 			{
 				int distanceToBase = CalcDistance(u, enemyBase);
 				if(distanceToBase > halfMap)
 				{
-					if(u.getX() != enemyBase.getX())
+					if(ourBase.getX() < halfMapW)
 					{
-						move(u, enemyBase.getX(), u.getY());
-					}else if(u.getY() != enemyBase.getY())
+						//Left side
+						XtoY(u, enemyBase, pgs);
+					}else
 					{
-						//Used to move unit toward enemy base. As move to a spot that is filled dosn't work.
-						attack(u, pgs.getUnitAt(enemyBase.getX(), enemyBase.getY()));
+						//Right side
+						YtoX(u, enemyBase, pgs);
 					}
 				}else {unitsReadyToAttack.add(u);}
 			}else {unitsReadyToAttack.add(u);}
@@ -346,15 +343,38 @@ public class Wanli extends AbstractionLayerAICustom
 		}
 		attackClosest(unitsReadyToAttack,enemies, p, pgs);
 	}
+	//Gets the unit to move toward the X position of the enemy base first.
+	public void XtoY(Unit u, Unit enemyBase, PhysicalGameState pgs)
+	{
+		if(u.getX() != enemyBase.getX())
+		{
+			move(u, enemyBase.getX(), u.getY());
+		}else if(u.getY() != enemyBase.getY())
+		{
+			//Used to move unit toward enemy base. As move to a spot that is filled dosn't work.
+			attack(u, enemyBase);
+		}
+	}
+	//Gets the unit to move to the Y position of the enemy base first.
+	public void YtoX(Unit u, Unit enemyBase, PhysicalGameState pgs)
+	{
+		if(u.getY() != enemyBase.getY())
+		{
+			move(u, u.getX(), enemyBase.getY());
+		}else if(u.getX() != enemyBase.getX())
+		{
+			attack(u, enemyBase);
+		}
+	}
 	
 	//Get the closes enemy unit and attack it.
 	public void attackClosest(List<Unit> attackers, List<Unit> enemies, Player p, PhysicalGameState pgs)
 	{
 		for(Unit u : attackers)
 		{
+			//Find the closest enemy unit for each unit given.
 			Unit closestEnemy = null;
 			int closestDist = 0;
-			
 			for(Unit u2: enemies)
 			{
 				if(u2.getPlayer() >= 0 && u2.getPlayer() != p.getID())
@@ -379,12 +399,12 @@ public class Wanli extends AbstractionLayerAICustom
 	{
 		int baseNum = 0;
 		int barrackNum = 0;
-		
+		//Stores a list of workers that are sorted to store only worker units which are avaliable to collect resources.
 		List<Unit> freeWorkers = new LinkedList<Unit>();
 		freeWorkers.addAll(workers);
 		
 		if(workers.isEmpty()) {return;}
-		
+		//Count bases and barracks we own.
 		for (Unit u2 : pgs.getUnits())
 		{
 			if(u2.getPlayer() == p.getID())
@@ -394,6 +414,7 @@ public class Wanli extends AbstractionLayerAICustom
 			}
 		}
 		
+		//Build a base if there isn't one.
 		List<Integer> reservedPositions = new LinkedList<Integer>();
 		if(baseNum == 0 && !freeWorkers.isEmpty()) 
 		{
@@ -403,10 +424,12 @@ public class Wanli extends AbstractionLayerAICustom
 				buildIfNotAlreadyBuilding(u, baseType, u.getX(), u.getY(), reservedPositions, p, pgs);
 			}
 		}
+		//Build a barracks if there isn't one.
 		if(barrackNum == 0 && !freeWorkers.isEmpty())
 		{
 			//Build barracks immediatley if the map is big enough.
-			if(tileCount > 100)
+			//Also do this when it is the 9x8 map, as there is enough time to build up units on that one.
+			if(tileCount > 100 || tileCount == NoWhereMapSize)
 			{
 				if(p.getResources() >= barracksType. cost )
 				{
@@ -425,12 +448,14 @@ public class Wanli extends AbstractionLayerAICustom
 					Unit u = freeWorkers.remove(0);
 					buildIfNotAlreadyBuilding(u, barracksType, basePosX, basePosY + 2, reservedPositions, p, pgs);
 				}
-			}else if (tileCount > 64)
+			}
+			//Build a barracks after having collected a resource buffer if the map is not 8x8 size.
+			else if (tileCount > 64)
 			{
 				//Wait until resources are built up to build a barracks.
 				//Gives the base resources to train workers to defend while the barracks is built
 				int resourceBuffer = 4;
-				if(tileCount == NoWhereMapSize) {resourceBuffer = 0;}
+
 				if(p.getResources() >= barracksType.cost + resourceBuffer)
 				{
 					int basePosX = 0, basePosY = 0;
@@ -455,6 +480,7 @@ public class Wanli extends AbstractionLayerAICustom
 		List<Unit> toAttack = new LinkedList<Unit>();
 		for (Unit u : freeWorkers)
 		{
+			//Find the closest resource for each unit.
 			Unit closestBase = null;
 			Unit closestResource = null;
 			int closestDistance = 0;
@@ -471,7 +497,7 @@ public class Wanli extends AbstractionLayerAICustom
 				}
 			}
 			closestDistance = 0;
-			
+			//Find the closest base for each unit.
 			for(Unit u2 : pgs.getUnits())
 			{
 				if(u2.getType().isStockpile && u2.getPlayer() == p.getID())
@@ -484,7 +510,8 @@ public class Wanli extends AbstractionLayerAICustom
 					}
 				}
 			}
-			
+			//Check if there is a resource and base, if so harvest.
+			//If there is not a base and a resource then attack the closest enemy.
 			if(closestResource != null && closestBase != null)
 			{
 				AbstractAction aa = getAbstractAction(u);
@@ -501,6 +528,7 @@ public class Wanli extends AbstractionLayerAICustom
 		attackClosest(toAttack, enemyUnits, p, pgs);
 	}
 	
+	//Find the distance between two enemies.
 	public int CalcDistance(Unit a, Unit b)
 	{
 		int distance = Math.abs(b.getX() - a.getX()) + Math.abs(b.getY() - a.getY());
@@ -508,14 +536,14 @@ public class Wanli extends AbstractionLayerAICustom
 	}
 	
 	@Override
-	public AI clone() {
-		// TODO Auto-generated method stub
+	public AI clone() 
+	{
 		return new Wanli(utt,pf);
 	}
 
 	@Override
-	public List<ParameterSpecification> getParameters() {
-		// TODO Auto-generated method stub
+	public List<ParameterSpecification> getParameters() 
+	{
 		List<ParameterSpecification> parameters = new ArrayList<>();
 		parameters.add(new ParameterSpecification("PathFinding", PathFinding.class, new AStarPathFinding()));
 		
